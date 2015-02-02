@@ -1,0 +1,129 @@
+/**
+ *  Let's Party!
+ *
+ *  Copyright 2015 Guillermo Spiller
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ *  in compliance with the License. You may obtain a copy of the License at:
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
+ *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
+ *  for the specific language governing permissions and limitations under the License.
+ *
+ */
+ 
+ /**
+  * Hosting a party has its challenges. This app is the first step towards simplifying them. Steps I wanted to simplify:
+  * Lock my room!
+  * Get SMS when new friends come
+  * Set the lights
+  * Turn the music on with a great playlist - I couldn't make the sonos to work :(
+  * Take pictures of party - I couldn't make Dropcam work :(
+  */
+ 
+definition(
+    name: "Let's Party!",
+    namespace: "guillespi",
+    author: "Guillermo Spiller",
+    description: "Having a party in your house? Get ir ready to have fun while not worrying about anything! The house will take care of everything for you ;)",
+    category: "My Apps",
+    iconUrl: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience.png",
+    iconX2Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png",
+    iconX3Url: "https://s3.amazonaws.com/smartapp-icons/Convenience/Cat-Convenience@2x.png")
+
+
+preferences {
+
+	section("During the party, lock the doors...") {
+		input "lock1","capability.lock", multiple: true
+        }
+        
+
+    section("Door for invitees..") {
+		input "Door", "capability.presenceSensor", title: "Which door?"
+	}
+	section("When someone at door, send a text message to...") {
+        input("recipients", "contact", title: "Send notifications to") {
+            input "phone", "phone", title: "Phone number?"
+        }
+	}
+	section("Reading lights (to turn off when party begins)"){
+		input "readinglights", "capability.switch", title: "These lights", multiple: true
+	}
+    section("Dancing lights (to turn on when party begins"){
+		input "dancinglights", "capability.switch", title: "These lights", multiple: true
+	}
+
+}
+
+def installed() {
+	log.debug "Installed with settings: ${settings}"
+
+	initialize()
+}
+
+def updated() {
+	log.debug "Updated with settings: ${settings}"
+
+	unsubscribe()
+	initialize()
+}
+
+def initialize() {
+    subscribe(app, appTouch)
+    subscribe(Door, "presence", presenceHandler)
+	state.name = "Quite"
+    log.info "${state.name}"
+}
+
+// When click on the app, let's the party begin!
+def appTouch(evt) {
+	if(state.name == "Quite") { 
+        log.info "Starting Party"
+		StartParty()
+        state.name = "Partying"
+	} else {
+		log.info "Ending Party"
+        EndParty()
+		state.name = "Quite"
+	}
+}    
+
+def StartParty(){
+    lock1.lock()
+    partylights()
+
+}
+
+
+def EndParty(){
+	// Unlocking all doors - I could only unlock doors that were unlocked before party, but simplifying logic..
+	lock1.unlock()
+	
+  partylights()    
+
+}
+
+// When a friend approaches the door, I get an SMS so I don't depend on hearing the doorbell
+def presenceHandler(evt) {
+	if (evt.value == "present" && state.name == "Partying") {
+		def msg = "More people coming.. A friends is at the door!"
+	    log.info "Sending notification $msg"
+  	  	sendSms(phone, msg)
+      }
+}
+
+def partylights() {
+if (state.name == "Quite"){
+	readinglights.off()
+    dancinglights.on()
+    } else {
+    readinglights.on()
+    dancinglights.off()
+
+    }
+}
+
+
